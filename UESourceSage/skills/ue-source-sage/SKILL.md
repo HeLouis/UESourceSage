@@ -9,17 +9,20 @@ Keep one learning-domain module and one Build.cs-scoped submodule active. A Buil
 
 ## Start Every Task
 
-1. Read `<workspace>/config/global.yaml` and `modules/index.md`.
-2. Resolve one learning-domain module. Create only its empty framework when the user explicitly starts that study.
-3. Resolve one submodule from `<module>/submodules/index.md`. A submodule owns exactly one explicitly configured Build.cs file.
-4. Read only the selected module/submodule manifests, routers, small process state, and compact question indexes.
-5. Normalize intent, topic or symbol, depth, and engine version.
-6. Route to the smallest indexes and at most the configured canonical-document budget.
-7. Access Unreal source only through `scripts/sage.py source read/search`; these commands enforce the selected submodule allowlist.
+1. Run `python skills/ue-source-sage/scripts/sage.py preflight`. If it fails, stop; do not create, discover, confirm, read, or advance anything.
+2. Read `<workspace>/config/global.yaml` and `modules/index.md`.
+3. Resolve one learning-domain module. Create it only when the user explicitly starts that study.
+4. Resolve one submodule from `<module>/submodules/index.md`. A submodule owns exactly one explicitly configured Build.cs file.
+5. Read only the selected module/submodule manifests, routers, small process state, and compact question indexes.
+6. Normalize intent, topic or symbol, depth, and engine version.
+7. Route to the smallest indexes and at most the configured canonical-document budget.
+8. Access Unreal source only through `scripts/sage.py source read/search`; these commands enforce the selected submodule allowlist.
 
 If the Build.cs path is unknown, request it or explicit discovery authorization. Do not inspect the engine tree before a submodule allowlist exists.
 
 Read [module-contract.md](references/module-contract.md) before creating scopes, [routing-protocol.md](references/routing-protocol.md) before source analysis, and [agent-protocol.md](references/agent-protocol.md) before selecting or creating a specialized agent.
+
+For a new or ambiguous domain, follow [domain-initialization.md](references/domain-initialization.md) and use the interaction contracts in [initialization-prompts.md](references/initialization-prompts.md). Do not create submodules until Build.cs candidates are explicitly confirmed.
 
 ## Maintain State
 
@@ -33,7 +36,10 @@ Run from the workspace root:
 
 ```powershell
 python skills/ue-source-sage/scripts/sage.py validate
+python skills/ue-source-sage/scripts/sage.py preflight
 python skills/ue-source-sage/scripts/sage.py module create <DomainName>
+python skills/ue-source-sage/scripts/sage.py discover build-cs <query> --within <EngineRelativeRoot> --module <domain-id>
+python skills/ue-source-sage/scripts/sage.py module confirm <domain-id> --build-cs <EngineRelativeBuildCs>
 python skills/ue-source-sage/scripts/sage.py submodule create <domain-id> <Name> --build-cs <RelativeBuildCs>
 python skills/ue-source-sage/scripts/sage.py source check <domain-id> <submodule-id> <EngineRelativePath>
 python skills/ue-source-sage/scripts/sage.py process show <domain-id> --submodule <submodule-id>

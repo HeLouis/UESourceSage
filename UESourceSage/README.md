@@ -26,6 +26,22 @@ modules/<learning-domain>/
 
 `validation/` 不是源码审计，也不是普通学习笔记。它保存 Prompt 路由和访问边界的回归测试：例如检查一个问题是否进入正确子模块，以及越界路径是否被拒绝。
 
+## 学习领域初始化协议
+
+用户说“学习某个领域”时，流程不是直接扫描并创建所有目录，而是：
+
+```text
+学习意图
+→ 创建领域空框架
+→ 缺少源码根则等待配置
+→ 在明确授权目录内做元数据级 Build.cs 模糊发现
+→ 用户确认候选
+→ 每个确认的 Build.cs 创建一个独立子模块
+→ 选择一个子模块进入正式学习
+```
+
+发现阶段只读取路径名、`*.Build.cs` 和 `*.uplugin` 文件名，不读取 `.h/.cpp` 实现，也不会自动创建候选子模块。状态记录在领域的 `initialization/state.json` 和 `history.jsonl`。
+
 ## Build.cs 访问边界
 
 每个子模块严格对应一个 Build.cs。该 Build.cs 所在目录自动成为唯一允许源码根；额外的 `.uplugin` 等文件必须单独列入 `allowed_files`。Build.cs 中声明的依赖只记录为边界，不会自动授权读取依赖模块。
@@ -51,9 +67,13 @@ python skills/ue-source-sage/scripts/sage.py source search <domain-id> <submodul
 ## 基础命令
 
 ```powershell
+python skills/ue-source-sage/scripts/sage.py preflight
 python skills/ue-source-sage/scripts/sage.py validate
-python skills/ue-source-sage/scripts/sage.py module create ModuleDomain --id module-domain
+python skills/ue-source-sage/scripts/sage.py discover build-cs mass --within Plugins/Runtime/MassEntity
+python skills/ue-source-sage/scripts/sage.py module create MassEntity --id massentity --from-discovery
+python skills/ue-source-sage/scripts/sage.py module confirm massentity --build-cs Plugins/Runtime/MassEntity/Source/MassCommon/MassCommon.Build.cs
 python skills/ue-source-sage/scripts/sage.py submodule create module-domain Core --id core --build-cs Engine/Plugins/Runtime/Example/Source/Example/Example.Build.cs
+python skills/ue-source-sage/scripts/sage.py module status module-domain
 python skills/ue-source-sage/scripts/sage.py submodule list module-domain
 python skills/ue-source-sage/scripts/sage.py process show module-domain --submodule core
 python skills/ue-source-sage/scripts/sage.py question add module-domain --submodule core --text "问题内容" --why "值得缓存的原因"

@@ -12,10 +12,11 @@ Use the repository skill at `skills/ue-source-sage/SKILL.md` for every Unreal En
 ## Start And Route
 
 1. Read `config/global.yaml` and `modules/index.md`.
-2. Create a domain only when the user explicitly starts or initializes that learning domain.
-3. Resolve its submodule with `submodules/index.md`.
-4. If the unique Build.cs path is unknown, request it or explicit discovery authorization. Do not inspect the engine tree to guess it.
-5. Read only the active manifests, routers, small process states, compact question indexes, and the smallest routed knowledge documents.
+2. Run `python skills/ue-source-sage/scripts/sage.py preflight`; if it fails, stop all learning workflow actions.
+3. Create a domain only when the user explicitly starts or initializes that learning domain.
+4. Resolve its submodule with `submodules/index.md`.
+5. If the unique Build.cs path is unknown, request it or explicit discovery authorization. Do not inspect the engine tree to guess it.
+6. Read only the active manifests, routers, small process states, compact question indexes, and the smallest routed knowledge documents.
 
 ## Source Boundary
 
@@ -32,4 +33,4 @@ Use the repository skill at `skills/ue-source-sage/SKILL.md` for every Unreal En
 - Reusable roles live in `skills/ue-source-sage/agents/roles/`; domain roles live in `modules/<domain>/agents/`; submodule roles live in its `agents/`.
 - Agent roles never grant source access. Start actual subagents only when the user explicitly requests delegation or parallel work.
 - `validation/` stores routing and boundary regression scenarios; it is not learned knowledge or source evidence.
-
+- For ambiguous domain names, use metadata-only discovery inside an explicitly authorized relative root, then ask the user to confirm candidates before creating submodules.

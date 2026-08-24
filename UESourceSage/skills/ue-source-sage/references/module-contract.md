@@ -10,6 +10,9 @@ modules/<domain-id>/
 ├─ module.yaml
 ├─ ROUTER.md
 ├─ agents/
+├─ initialization/
+│  ├─ state.json
+│  └─ history.jsonl
 ├─ submodules/
 │  ├─ index.md
 │  └─ <submodule-id>/

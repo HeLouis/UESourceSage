@@ -155,9 +155,11 @@ def config_problems(root: Path, config: dict[str, Any]) -> tuple[list[str], list
     if not isinstance(source_root, str):
         errors.append("engine.source_root must be a string")
     elif not source_root.strip():
-        warnings.append("engine.source_root is not configured")
+        errors.append("engine.source_root must be configured before any learning workflow can start")
+    elif not Path(source_root).expanduser().is_absolute():
+        errors.append("engine.source_root must be an absolute path")
     elif not Path(source_root).expanduser().is_dir():
-        warnings.append(f"engine.source_root does not exist or is inaccessible: {source_root}")
+        errors.append(f"engine.source_root does not exist or is inaccessible: {source_root}")
     if not nested(config, "project", "language"):
         errors.append("project.language is required")
     for keys, label in (
@@ -165,6 +167,7 @@ def config_problems(root: Path, config: dict[str, Any]) -> tuple[list[str], list
         (("paths", "module_index"), "paths.module_index"),
         (("paths", "module_template"), "paths.module_template"),
         (("paths", "submodule_template"), "paths.submodule_template"),
+        (("paths", "discovery_state"), "paths.discovery_state"),
         (("personal_progress", "directory"), "personal_progress.directory"),
     ):
         value = nested(config, *keys)
@@ -579,9 +582,31 @@ def validate_submodule(module: Path, submodule: Path) -> list[str]:
 
 def validate_module(module: Path) -> list[str]:
     errors = validate_learning_scope(module, "module.yaml", "module")
+    for relative in ("initialization/state.json", "initialization/history.jsonl"):
+        if not (module / relative).is_file():
+            errors.append(f"{module.name}: missing {relative}")
     if not (module / "submodules" / "index.md").is_file():
         errors.append(f"{module.name}: missing submodules/index.md")
         return errors
+    try:
+        initialization = load_initialization(module)
+        allowed_states = {
+            "requested", "awaiting_engine_config", "domain_created", "awaiting_build_scope",
+            "discovery_authorized", "candidate_confirmation_required", "submodules_registered",
+            "ready_for_learning", "blocked",
+        }
+        if initialization.get("domain_id") != module.name:
+            errors.append(f"{module.name}: initialization domain_id mismatch")
+        if initialization.get("state") not in allowed_states:
+            errors.append(f"{module.name}: invalid initialization state")
+        if not isinstance(initialization.get("candidates"), list):
+            errors.append(f"{module.name}: initialization candidates must be a list")
+        if not isinstance(initialization.get("confirmed_build_cs"), list):
+            errors.append(f"{module.name}: confirmed_build_cs must be a list")
+        if not isinstance(initialization.get("confirmed_submodules"), list):
+            errors.append(f"{module.name}: confirmed_submodules must be a list")
+    except UserError as exc:
+        errors.append(f"{module.name}: {exc}")
     expected_index = render_submodules_index(module)
     if (module / "submodules" / "index.md").read_text(encoding="utf-8") != expected_index:
         errors.append(f"{module.name}: submodules/index.md is stale; run submodule rebuild-index")
@@ -627,12 +652,16 @@ def validate_skill(root: Path) -> list[str]:
         "references/process-protocol.md",
         "references/questions-protocol.md",
         "references/routing-protocol.md",
+        "references/domain-initialization.md",
+        "references/initialization-prompts.md",
         "assets/module-template/module.yaml.tpl",
         "assets/submodule-template/submodule.yaml.tpl",
         "agents/roles/boundary-guard.md",
         "agents/roles/source-mapper.md",
         "agents/roles/callflow-tracer.md",
         "agents/roles/question-curator.md",
+        "assets/module-template/initialization/state.json.tpl",
+        "assets/module-template/initialization/history.jsonl.tpl",
     ):
         if not (skill / relative).is_file():
             errors.append(f"skill is missing {relative}")
@@ -676,6 +705,20 @@ def command_validate(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_preflight(args: argparse.Namespace) -> int:
+    root = workspace(args)
+    config = load_config(root)
+    errors, warnings = config_problems(root, config)
+    for warning in warnings:
+        print(f"Warning: {warning}")
+    if errors:
+        for error in errors:
+            print(f"Error: {error}", file=sys.stderr)
+        return 1
+    print("Global configuration preflight passed. Learning workflow is unlocked.")
+    return 0
+
+
 def command_module_create(args: argparse.Namespace) -> int:
     root = workspace(args)
     config = require_config(root)
@@ -696,6 +739,12 @@ def command_module_create(args: argparse.Namespace) -> int:
         "engine_version": str(nested(config, "engine", "version")),
         "max_canonical_docs": str(nested(config, "routing", "max_canonical_docs")),
     }
+    discovery = None
+    if args.from_discovery:
+        discovery_path = resolve_inside(root, nested(config, "paths", "discovery_state"), "paths.discovery_state")
+        discovery = load_json(discovery_path)
+        if not discovery.get("candidates"):
+            raise UserError("No discovery candidates are available for --from-discovery")
     template = resolve_inside(root, nested(config, "paths", "module_template"), "paths.module_template")
     plan = template_plan(template, values)
     if args.dry_run:
@@ -709,6 +758,31 @@ def command_module_create(args: argparse.Namespace) -> int:
         target.write_text(content, encoding="utf-8", newline="\n")
     write_question_views(destination, load_questions(destination))
     write_submodules_index(destination)
+    initialization = load_initialization(destination)
+    initialization_state = "awaiting_build_scope"
+    timestamp = now_utc()
+    initialization["state"] = initialization_state
+    initialization["updated_at"] = timestamp
+    if args.from_discovery:
+        initialization.update({
+            "state": "candidate_confirmation_required",
+            "query": discovery.get("query"),
+            "discovery_root": discovery.get("discovery_root"),
+            "discovery_mode": discovery.get("discovery_mode"),
+            "candidates": discovery.get("candidates", []),
+        })
+    atomic_json(destination / "initialization" / "state.json", initialization)
+    append_initialization_history(destination, {
+        "at": timestamp,
+        "event": "initialization_waiting",
+        "state": initialization_state,
+    })
+    if args.from_discovery:
+        append_initialization_history(destination, {
+            "at": timestamp,
+            "event": "discovery_attached",
+            "state": "candidate_confirmation_required",
+        })
     write_modules_index(root, config)
     print(f"Created empty module framework: {destination}")
     return 0
@@ -793,6 +867,21 @@ def command_submodule_create(args: argparse.Namespace) -> int:
     write_question_views(destination, load_questions(destination))
     write_submodules_index(module)
     write_modules_index(root, config)
+    if getattr(args, "register_initialization", True):
+        initialization = load_initialization(module)
+        timestamp = now_utc()
+        initialization["state"] = "ready_for_learning"
+        initialization["confirmed_build_cs"] = list(initialization.get("confirmed_build_cs", [])) + [build_cs]
+        initialization["confirmed_submodules"] = list(initialization.get("confirmed_submodules", [])) + [submodule_id]
+        initialization["updated_at"] = timestamp
+        atomic_json(module / "initialization" / "state.json", initialization)
+        append_initialization_history(module, {
+            "at": timestamp,
+            "event": "submodule_registered",
+            "build_cs": build_cs,
+            "submodule": submodule_id,
+            "source": "explicit_build_cs",
+        })
     print(f"Created Build.cs-scoped submodule: {destination}")
     return 0
 
@@ -964,6 +1053,230 @@ def command_module_rebuild_index(args: argparse.Namespace) -> int:
     config = require_config(root)
     write_modules_index(root, config)
     print("Rebuilt modules/index.md.")
+    return 0
+
+
+def load_initialization(module: Path) -> dict[str, Any]:
+    return load_json(module / "initialization" / "state.json")
+
+
+def append_initialization_history(module: Path, event: dict[str, Any]) -> None:
+    with (module / "initialization" / "history.jsonl").open("a", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+
+
+def command_module_status(args: argparse.Namespace) -> int:
+    root = workspace(args)
+    config = require_config(root)
+    module = require_module(root, config, args.module)
+    state = load_initialization(module)
+    print(f"domain={module.name} initialization_state={state.get('state')}")
+    print(f"query={state.get('query') or ''}")
+    print(f"discovery_root={state.get('discovery_root') or ''}")
+    print(f"candidates={len(state.get('candidates', []))}")
+    print(f"confirmed_submodules={', '.join(state.get('confirmed_submodules', []))}")
+    return 0
+
+
+def normalize_engine_relative(value: str) -> str:
+    normalized = value.strip().replace("\\", "/")
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    return normalized
+
+
+def candidate_module_name(path: str) -> str:
+    filename = Path(path).name
+    if filename.endswith(".Build.cs"):
+        return filename[: -len(".Build.cs")]
+    if filename.endswith(".uplugin"):
+        return filename[: -len(".uplugin")]
+    return Path(filename).stem
+
+
+def discover_build_cs(engine_root: Path, query: str, within: str | None) -> tuple[str, list[dict[str, Any]]]:
+    relative_root = normalize_engine_relative(within or ".")
+    search_root = resolve_inside(engine_root, relative_root, "discovery root")
+    if not search_root.is_dir():
+        raise UserError(f"Discovery root is not a directory: {within}")
+    normalized_query = query.strip().casefold()
+    compact_query = re.sub(r"[^a-z0-9]+", "", normalized_query)
+    if not normalized_query:
+        raise UserError("Discovery query cannot be empty")
+    files = [path for path in sorted(search_root.rglob("*")) if path.is_file()]
+    plugin_files = [path for path in files if path.suffix.lower() == ".uplugin"]
+    build_files = [path for path in files if path.name.endswith(".Build.cs")]
+    plugins_by_directory = {path.parent.resolve(): path for path in plugin_files}
+    groups: dict[str, dict[str, Any]] = {}
+
+    def plugin_for(build_path: Path) -> Path | None:
+        current = build_path.parent.resolve()
+        engine_resolved = engine_root.resolve()
+        while current == engine_resolved or engine_resolved in current.parents:
+            if current in plugins_by_directory:
+                return plugins_by_directory[current]
+            if current == engine_resolved:
+                break
+            current = current.parent
+        return None
+
+    for build_path in build_files:
+        build_relative = build_path.relative_to(engine_root).as_posix()
+        plugin_path = plugin_for(build_path)
+        if plugin_path:
+            group_key = plugin_path.resolve().as_posix()
+            domain_name = candidate_module_name(plugin_path.relative_to(engine_root).as_posix())
+            domain_path = plugin_path.relative_to(engine_root).as_posix()
+        else:
+            group_key = build_path.parent.resolve().as_posix()
+            domain_name = build_path.parent.name
+            domain_path = build_path.parent.relative_to(engine_root).as_posix()
+        haystack = " ".join((domain_name, domain_path, build_relative)).casefold()
+        compact_haystack = re.sub(r"[^a-z0-9]+", "", haystack)
+        if normalized_query not in haystack and (not compact_query or compact_query not in compact_haystack):
+            continue
+        group = groups.setdefault(group_key, {
+            "kind": "domain_candidate",
+            "name": domain_name,
+            "path": domain_path,
+            "plugin_path": plugin_path.relative_to(engine_root).as_posix() if plugin_path else None,
+            "build_cs": [],
+        })
+        group["build_cs"].append({
+            "name": candidate_module_name(build_relative),
+            "path": build_relative,
+        })
+
+    # A matching plugin name should surface its Build.cs group even when the Build.cs filename does not contain the query.
+    for plugin_path in plugin_files:
+        plugin_relative = plugin_path.relative_to(engine_root).as_posix()
+        plugin_name = candidate_module_name(plugin_relative)
+        plugin_haystack = (plugin_name + " " + plugin_relative).casefold()
+        plugin_compact = re.sub(r"[^a-z0-9]+", "", plugin_haystack)
+        if normalized_query not in plugin_haystack and (not compact_query or compact_query not in plugin_compact):
+            continue
+        key = plugin_path.resolve().as_posix()
+        if key in groups:
+            continue
+        group = {
+            "kind": "domain_candidate",
+            "name": plugin_name,
+            "path": plugin_relative,
+            "plugin_path": plugin_relative,
+            "build_cs": [],
+        }
+        for build_path in build_files:
+            if plugin_path.parent.resolve() in build_path.resolve().parents:
+                relative = build_path.relative_to(engine_root).as_posix()
+                group["build_cs"].append({"name": candidate_module_name(relative), "path": relative})
+        groups[key] = group
+    return relative_root, list(groups.values())
+
+
+def command_discover_build_cs(args: argparse.Namespace) -> int:
+    root = workspace(args)
+    config = require_config(root)
+    engine_root = engine_root_from_config(config)
+    relative_root, candidates = discover_build_cs(engine_root, args.query, args.within)
+    discovery = {
+        "schema_version": 1,
+        "query": args.query,
+        "discovery_root": relative_root,
+        "discovery_mode": "metadata_only",
+        "candidates": candidates,
+        "updated_at": now_utc(),
+    }
+    discovery_path = resolve_inside(root, nested(config, "paths", "discovery_state"), "paths.discovery_state")
+    atomic_json(discovery_path, discovery)
+    if args.module:
+        module = require_module(root, config, args.module)
+        state = load_initialization(module)
+        timestamp = now_utc()
+        state.update({
+            "state": "candidate_confirmation_required",
+            "query": args.query,
+            "discovery_root": relative_root,
+            "discovery_mode": "metadata_only",
+            "candidates": candidates,
+            "updated_at": timestamp,
+        })
+        atomic_json(module / "initialization" / "state.json", state)
+        append_initialization_history(module, {
+            "at": timestamp,
+            "event": "discovery_authorized",
+            "query": args.query,
+            "discovery_root": relative_root,
+            "mode": "metadata_only",
+        })
+        append_initialization_history(module, {
+            "at": timestamp,
+            "event": "discovery_completed",
+            "query": args.query,
+            "discovery_root": relative_root,
+            "candidate_count": len(candidates),
+        })
+    if not candidates:
+        print("No metadata candidates found.")
+        return 0
+    print("Metadata-only domain candidates (no .h/.cpp content was read):")
+    for index, candidate in enumerate(candidates, start=1):
+        print(f"{index}. {candidate['name']}\t{candidate['path']}")
+        for build_cs in candidate.get("build_cs", []):
+            print(f"   - {build_cs['name']}.Build.cs\t{build_cs['path']}")
+    if args.module:
+        print(f"Candidates recorded for {args.module}; confirm selected Build.cs paths with module confirm.")
+    return 0
+
+
+def command_module_confirm(args: argparse.Namespace) -> int:
+    root = workspace(args)
+    config = require_config(root)
+    module = require_module(root, config, args.module)
+    state = load_initialization(module)
+    requested = [normalize_engine_relative(value) for value in args.build_cs if value.strip()]
+    if not requested:
+        raise UserError("At least one --build-cs is required for confirmation")
+    candidates = {
+        build.get("path")
+        for item in state.get("candidates", [])
+        for build in item.get("build_cs", [])
+        if isinstance(build, dict) and build.get("path")
+    }
+    if candidates:
+        unknown = [value for value in requested if value not in candidates]
+        if unknown:
+            raise UserError("Build.cs paths were not in the recorded discovery candidates: " + ", ".join(unknown))
+    existing = set(state.get("confirmed_build_cs", []))
+    if existing.intersection(requested):
+        raise UserError("Build.cs already confirmed: " + ", ".join(sorted(existing.intersection(requested))))
+    submodule_ids: list[str] = []
+    for build_cs in requested:
+        display_name = candidate_module_name(build_cs)
+        submodule_id = slugify(display_name)
+        command_submodule_create(argparse.Namespace(
+            root=args.root,
+            module=module.name,
+            name=display_name,
+            id=submodule_id,
+            build_cs=build_cs,
+            allow_file=[],
+            dry_run=False,
+            register_initialization=False,
+        ))
+        submodule_ids.append(submodule_id)
+    timestamp = now_utc()
+    state["state"] = "ready_for_learning"
+    state["confirmed_build_cs"] = list(state.get("confirmed_build_cs", [])) + requested
+    state["confirmed_submodules"] = list(state.get("confirmed_submodules", [])) + submodule_ids
+    state["updated_at"] = timestamp
+    atomic_json(module / "initialization" / "state.json", state)
+    append_initialization_history(module, {
+        "at": timestamp,
+        "event": "submodules_registered",
+        "build_cs": requested,
+        "submodules": submodule_ids,
+    })
+    print(f"Confirmed and registered submodules: {', '.join(submodule_ids)}")
     return 0
 
 
@@ -1195,18 +1508,36 @@ def build_parser() -> argparse.ArgumentParser:
 
     validate = commands.add_parser("validate", help="Validate config, indexes, process, and questions")
     validate.set_defaults(handler=command_validate)
+    preflight = commands.add_parser("preflight", help="Validate global config before unlocking workflows")
+    preflight.set_defaults(handler=command_preflight)
 
     module = commands.add_parser("module", help="Manage isolated source-learning modules")
     module_commands = module.add_subparsers(dest="module_command", required=True)
     create = module_commands.add_parser("create", help="Create an empty module framework")
     create.add_argument("name")
     create.add_argument("--id")
+    create.add_argument("--from-discovery", action="store_true", help="Attach the latest metadata-only discovery result")
     create.add_argument("--dry-run", action="store_true")
     create.set_defaults(handler=command_module_create)
     list_modules = module_commands.add_parser("list", help="List configured modules")
     list_modules.set_defaults(handler=command_module_list)
     rebuild_modules = module_commands.add_parser("rebuild-index", help="Regenerate modules/index.md")
     rebuild_modules.set_defaults(handler=command_module_rebuild_index)
+    module_status = module_commands.add_parser("status", help="Show domain initialization state")
+    module_status.add_argument("module")
+    module_status.set_defaults(handler=command_module_status)
+    confirm_module = module_commands.add_parser("confirm", help="Confirm Build.cs candidates and register submodules")
+    confirm_module.add_argument("module")
+    confirm_module.add_argument("--build-cs", required=True, action="append")
+    confirm_module.set_defaults(handler=command_module_confirm)
+
+    discover = commands.add_parser("discover", help="Metadata-only discovery within an authorized engine-relative root")
+    discover_commands = discover.add_subparsers(dest="discover_command", required=True)
+    discover_build = discover_commands.add_parser("build-cs", help="Find matching Build.cs and uplugin names")
+    discover_build.add_argument("query")
+    discover_build.add_argument("--within", help="Optional engine-relative discovery root; defaults to engine.source_root")
+    discover_build.add_argument("--module", help="Record candidates in an existing domain")
+    discover_build.set_defaults(handler=command_discover_build_cs)
 
     submodule = commands.add_parser("submodule", help="Manage Build.cs-scoped submodules")
     submodule_commands = submodule.add_subparsers(dest="submodule_command", required=True)
