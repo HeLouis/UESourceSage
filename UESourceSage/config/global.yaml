@@ -1,0 +1,32 @@
+schema_version: 2
+
+project:
+  name: "UE Source Sage"
+  language: "zh-CN"
+
+engine:
+  source_root: ""
+  version: "5.6"
+  source_access: "read_only"
+
+paths:
+  modules: "modules"
+  module_index: "modules/index.md"
+  module_template: "skills/ue-source-sage/assets/module-template"
+  submodule_template: "skills/ue-source-sage/assets/submodule-template"
+
+routing:
+  max_canonical_docs: 3
+  require_active_submodule: true
+  source_access_via_guarded_commands: true
+
+personal_progress:
+  enabled: true
+  backend: "local"
+  directory: ".personal-progress"
+  auto_record: false
+
+evidence:
+  require_file_line_references: true
+  distinguish_fact_and_inference: true
+  record_engine_version: true
