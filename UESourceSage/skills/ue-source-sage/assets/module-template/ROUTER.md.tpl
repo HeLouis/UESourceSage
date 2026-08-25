@@ -8,3 +8,4 @@ Keep `{{module_name}}` (`{{module_id}}`) as the learning domain. This file route
 4. Route cross-submodule questions at domain level; route ordinary work to the selected submodule.
 5. Never infer source permission from a Build.cs dependency.
 6. Use guarded source commands under the selected submodule.
+7. Activate the executable route for the selected submodule before source access; a route change invalidates prior context.

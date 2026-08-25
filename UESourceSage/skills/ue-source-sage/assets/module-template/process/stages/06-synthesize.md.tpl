@@ -8,9 +8,10 @@ Produce a coherent learning map and retain unresolved questions explicitly.
 
 ## Evidence
 
+## Deliverables
+
 ## Cached Questions
 
 ## Exit Assessment
 
 ## Next-stage Handoff
-

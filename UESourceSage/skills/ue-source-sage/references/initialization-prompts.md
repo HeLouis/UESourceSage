@@ -11,7 +11,7 @@ These are interaction contracts, not domain knowledge. Keep them concise and ask
 请选择下一步：
 1. 只创建学习领域空框架；
 2. 提供一个明确的 Build.cs 路径并开始该子模块；
-3. 授权我只在指定源码相对目录内查找 *.Build.cs 和 *.uplugin 名称。
+3. 先做只读的 Build.cs 候选发现，再由你确认候选。
 ```
 
 ## Missing Engine Root
@@ -21,15 +21,15 @@ These are interaction contracts, not domain knowledge. Keep them concise and ask
 请先配置绝对的 Unreal Engine 源码根目录。配置通过前，不会创建学习领域、发现 Build.cs 或读取源码。
 ```
 
-## Discovery Authorization
+## Metadata-only Discovery
 
 ```text
 “{query}”存在多个可能的 Unreal 模块。
-我只会在以下相对目录内搜索路径名、*.Build.cs 和 *.uplugin 文件名：
+我会在以下相对目录内只搜索路径名、*.Build.cs 和 *.uplugin 文件名：
 {discovery_root}
 
-不会读取 .h/.cpp 实现，不会自动创建子模块。
-是否授权这次元数据级发现？
+不会读取 .h/.cpp 实现，也不会自动创建领域或子模块。
+下面是扫描得到的候选，请确认要学习的领域和具体 Build.cs。
 ```
 
 ## Candidate Confirmation

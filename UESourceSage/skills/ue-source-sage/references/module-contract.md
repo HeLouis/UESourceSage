@@ -9,7 +9,7 @@
 modules/<domain-id>/
 ├─ module.yaml
 ├─ ROUTER.md
-├─ agents/
+├─ roles/
 ├─ initialization/
 │  ├─ state.json
 │  └─ history.jsonl
@@ -18,14 +18,16 @@ modules/<domain-id>/
 │  └─ <submodule-id>/
 │     ├─ submodule.yaml
 │     ├─ ROUTER.md
-│     ├─ agents/
-│     ├─ references/{indexes,sources}/
+│     ├─ roles/
+│     ├─ references/{indexes,sources,knowledge}/
 │     ├─ process/
 │     ├─ questions/
+│     │  └─ history.jsonl
 │     └─ validation/routing-scenarios.md
-├─ references/{indexes,sources}/
+├─ references/{indexes,sources,knowledge}/
 ├─ process/
 ├─ questions/
+│  └─ history.jsonl
 └─ validation/routing-scenarios.md
 ```
 
@@ -45,7 +47,7 @@ Apply these rules:
 6. Record a dependency outside the allowlist in `boundaries.index.md` or questions. To study it, activate or create the separate one-Build.cs submodule that owns it.
 7. Access engine source through the guarded `source` CLI commands. Direct recursive reads of the engine tree violate the contract.
 
-Do not inspect the engine tree to discover Build.cs paths without explicit discovery authorization. A domain may exist with zero submodules while waiting for the first Build.cs path.
+When a Build.cs path is unknown, metadata-only discovery may scan the configured `engine.source_root` (optionally narrowed with a relative `--within` root). This scan reads only paths and descriptor/file names, so it does not require separate authorization and does not create scopes. A domain may exist with zero submodules while waiting for the user's Build.cs confirmation.
 
 ## Validation
 
@@ -53,4 +55,8 @@ Do not inspect the engine tree to discover Build.cs paths without explicit disco
 
 ## Canonical Knowledge Documents
 
-Keep one focused mechanism or question per document. Include scope and version, a quick answer, ordered source trail, mechanism, boundaries and misconceptions, and linked question IDs. Prefer file/symbol/line evidence over pasted source. Mark evidence as `verified_source`, `inferred`, `experiment_verified`, or `stale_version`.
+Keep one focused mechanism or question per document under `references/knowledge/`. Create it with `sage.py knowledge create`; the CLI maintains `references/indexes/sources.index.md`. Include scope and version, a quick answer, ordered source trail, mechanism, boundaries and misconceptions, and linked question IDs. Prefer file/symbol/line evidence over pasted source. Mark evidence as `draft`, `verified_source`, `inferred`, `experiment_verified`, or `stale_version`.
+
+The configured engine version is part of every scope manifest. If it differs from the current global configuration, learning commands stop with an engine-version mismatch until the scope is reinitialized or its metadata is deliberately updated.
+
+Use `version status` to inspect mismatches and `version migrate` with an explicit reason to update scope manifests. Migration marks affected knowledge documents `stale_version`, clears the active route, and records the event in process history; it never silently rewrites knowledge claims.

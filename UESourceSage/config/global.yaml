@@ -15,6 +15,7 @@ paths:
   module_template: "skills/ue-source-sage/assets/module-template"
   submodule_template: "skills/ue-source-sage/assets/submodule-template"
   discovery_state: ".workflow/discovery.json"
+  active_route_state: ".workflow/active-route.json"
 
 routing:
   max_canonical_docs: 3

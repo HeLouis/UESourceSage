@@ -8,11 +8,11 @@
   "current_stage": "scope",
   "updated_at": "{{created_at}}",
   "stages": {
-    "scope": {"status": "not_started", "started_at": null, "completed_at": null, "summary": "", "evidence": []},
-    "map": {"status": "not_started", "started_at": null, "completed_at": null, "summary": "", "evidence": []},
-    "model": {"status": "not_started", "started_at": null, "completed_at": null, "summary": "", "evidence": []},
-    "trace": {"status": "not_started", "started_at": null, "completed_at": null, "summary": "", "evidence": []},
-    "verify": {"status": "not_started", "started_at": null, "completed_at": null, "summary": "", "evidence": []},
-    "synthesize": {"status": "not_started", "started_at": null, "completed_at": null, "summary": "", "evidence": []}
+    "scope": {"status": "not_started", "started_at": null, "completed_at": null, "summary": "", "work_completed": "", "exit_assessment": "", "next_stage_handoff": "", "deliverables": [], "evidence": []},
+    "map": {"status": "not_started", "started_at": null, "completed_at": null, "summary": "", "work_completed": "", "exit_assessment": "", "next_stage_handoff": "", "deliverables": [], "evidence": []},
+    "model": {"status": "not_started", "started_at": null, "completed_at": null, "summary": "", "work_completed": "", "exit_assessment": "", "next_stage_handoff": "", "deliverables": [], "evidence": []},
+    "trace": {"status": "not_started", "started_at": null, "completed_at": null, "summary": "", "work_completed": "", "exit_assessment": "", "next_stage_handoff": "", "deliverables": [], "evidence": []},
+    "verify": {"status": "not_started", "started_at": null, "completed_at": null, "summary": "", "work_completed": "", "exit_assessment": "", "next_stage_handoff": "", "deliverables": [], "evidence": []},
+    "synthesize": {"status": "not_started", "started_at": null, "completed_at": null, "summary": "", "work_completed": "", "exit_assessment": "", "next_stage_handoff": "", "deliverables": [], "evidence": []}
   }
 }

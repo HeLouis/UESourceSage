@@ -8,9 +8,10 @@ Explain concepts, ownership, lifetimes, invariants, and data relationships.
 
 ## Evidence
 
+## Deliverables
+
 ## Cached Questions
 
 ## Exit Assessment
 
 ## Next-stage Handoff
-

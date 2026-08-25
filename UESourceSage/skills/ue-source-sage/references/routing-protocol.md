@@ -22,6 +22,10 @@ Resolve the domain module, Build.cs-scoped submodule, intent (`orient`, `explain
 - A domain-level comparison may read rendered knowledge from multiple submodules, but it does not directly grant engine-source access. Inspect source under one active submodule at a time.
 - Re-route and discard unrelated context when the active submodule changes.
 
+## Executable Route
+
+Use `sage.py route activate` or `route resolve` after selecting the domain and submodule. The route state is stored in the configured active-route file and contains the intent, topic, selected role, compact index set, canonical-document list, engine version, and a generation id. `source check/read/search` requires that active route to match the requested domain/submodule. A route activation clears the validity of prior scope context and prevents stale submodule reads.
+
 ## Reading Budget And Output
 
 Read one domain route row, one submodule route row, one intent and topic/constraint row, up to three canonical documents by default, and the minimum allowlisted source files. Lead with the answer, state domain/submodule/version once, give an ordered source trail, and distinguish verified facts, inference, and unresolved questions. Do not dump indexes, internal routing narration, or large source blocks.

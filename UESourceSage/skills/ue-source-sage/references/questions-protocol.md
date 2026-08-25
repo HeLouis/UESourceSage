@@ -14,7 +14,7 @@ Questions are durable knowledge debt, not a scratchpad. Cache a question in the 
 
 ## Required Fields
 
-Every question has an id, exact question, why it is worth caching, topic, priority, discovery stage, status, timestamps, answer, and evidence list. The script derives the discovery stage from `process/state.json` unless explicitly supplied.
+Every question has an id, exact question, why it is worth caching, topic, priority, discovery stage, status, timestamps, answer, evidence list, canonical document links, and optional promotion provenance. The script derives the discovery stage from `process/state.json` unless explicitly supplied.
 
 ## Mutation Rules
 
@@ -24,5 +24,7 @@ Every question has an id, exact question, why it is worth caching, topic, priori
 4. Do not move to `verified` without version-appropriate source or experiment evidence.
 5. Link stable answers into a canonical knowledge document; the question remains as provenance.
 6. Record follow-up questions separately when they change the scope.
+7. A question that genuinely spans configured submodules is promoted explicitly from the submodule to the domain queue; promotion preserves the source question id as provenance.
+8. Stable answers must link one or more documents under `references/knowledge/`; a question cannot enter `verified` without such a link.
 
-Each scope owns its own ids and canonical `questions/state.json`. Its `index.md` and `items/Q-xxxx.md` are rendered views. Mutate the intended scope with `scripts/sage.py question ... [--submodule <id>]`.
+Each scope owns its own ids, canonical `questions/state.json`, and append-only `questions/history.jsonl`. Its `index.md` and `items/Q-xxxx.md` are rendered views. Mutate the intended scope with `scripts/sage.py question ... [--submodule <id>]`. Use `question promote` for explicit submodule-to-domain promotion and `question answer --document` to associate a stable answer with canonical knowledge. Promotion writes both sides of the provenance link; answering a promoted domain question updates the source question's domain resolution status.
