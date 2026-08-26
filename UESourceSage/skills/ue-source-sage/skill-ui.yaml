@@ -1,4 +1,0 @@
-interface:
-  display_name: "UE Source Sage"
-  short_description: "按模块精准路由、缓存问题并完整记录 UE 源码学习阶段"
-  default_prompt: "Use $ue-source-sage to study one Unreal Engine source module with scoped routing, process stages, and cached questions."
